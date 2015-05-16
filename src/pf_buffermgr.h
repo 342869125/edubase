@@ -15,6 +15,9 @@
 #ifndef PF_BUFFERMGR_H
 #define PF_BUFFERMGR_H
 
+#include <time.h>
+#include <deque>
+
 #include "pf_internal.h"
 #include "pf_hashtable.h"
 
@@ -28,6 +31,9 @@
 // next.
 #define INVALID_SLOT  (-1)
 
+// K_FOR_LRU_K is configurable value for LRU-K algorithm
+#define K_FOR_LRU_K 2
+
 //
 // PF_BufPageDesc - struct containing data about a page in the buffer
 //
@@ -37,6 +43,7 @@ struct PF_BufPageDesc {
     int        prev;        // prev in the linked list of buffer pages
     int        bDirty;      // TRUE if page is dirty
     short int  pinCount;    // pin count
+    std::deque<time_t> hists;    // access time histories
     PageNum    pageNum;     // page number for this page
     int        fd;          // OS file descriptor of this page
 };

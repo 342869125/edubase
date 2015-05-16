@@ -236,6 +236,10 @@ RC PF_BufferMgr::GetPage(int fd, PageNum pageNum, char **ppBuffer,
 
       // Page is alredy in memory, just increment pin count
       bufTable[slot].pinCount++;
+      bufTable[slot].hists.push_back(time(NULL));
+      if (bufTable[slot].hists.size() > K_FOR_LRU_K)
+	 // Keep only K(in LRU-K) histories
+         bufTable[slot].hists.pop_front();
 #ifdef PF_LOG
       sprintf (psMessage, "Page found in buffer.  %d pin count.\n",
             bufTable[slot].pinCount);
@@ -385,6 +389,7 @@ RC PF_BufferMgr::UnpinPage(int fd, PageNum pageNum)
 #endif
 
    // If unpinning the last pin, make it the most recently used page
+   bufTable[slot].hists.pop_front();
    if (--(bufTable[slot].pinCount) == 0) {
       if ((rc = Unlink(slot)) ||
             (rc = LinkHead (slot)))
@@ -784,10 +789,19 @@ RC PF_BufferMgr::InternalAlloc(int &slot)
    }
    else {
 
-      // Choose the least-recently used page that is unpinned
-      for (slot = last; slot != INVALID_SLOT; slot = bufTable[slot].prev) {
-         if (bufTable[slot].pinCount == 0)
-            break;
+     // Choose the least-recently used page that is unpinned
+     int &candidate = slot, accessedTime = -1;
+      for (candidate = last;
+           candidate != INVALID_SLOT;
+           candidate = bufTable[candidate].prev) {
+         if (bufTable[slot].pinCount == 0) {
+            if (accessedTime == -1 ||
+                bufTable[slot].hists.front() < accessedTime) {
+               slot = candidate;
+               accessedTime = bufTable[candidate].hists.back();
+               break;
+            }
+         }
       }
 
       // Return error if all buffers were pinned
@@ -910,6 +924,8 @@ RC PF_BufferMgr::InitPageDesc(int fd, PageNum pageNum, int slot)
    bufTable[slot].pageNum  = pageNum;
    bufTable[slot].bDirty   = FALSE;
    bufTable[slot].pinCount = 1;
+   bufTable[slot].hists = deque<time_t>();
+   bufTable[slot].hists.push_back(time(NULL));
 
    // Return ok
    return (0);
