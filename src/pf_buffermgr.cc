@@ -789,10 +789,19 @@ RC PF_BufferMgr::InternalAlloc(int &slot)
    }
    else {
 
-      // Choose the least-recently used page that is unpinned
-      for (slot = last; slot != INVALID_SLOT; slot = bufTable[slot].prev) {
-         if (bufTable[slot].pinCount == 0)
-            break;
+     // Choose the least-recently used page that is unpinned
+     int &candidate = slot, accessedTime = -1;
+      for (candidate = last;
+           candidate != INVALID_SLOT;
+           candidate = bufTable[candidate].prev) {
+         if (bufTable[slot].pinCount == 0) {
+            if (accessedTime == -1 ||
+                bufTable[slot].hists.front() < accessedTime) {
+               slot = candidate;
+               accessedTime = bufTable[candidate].hists.back();
+               break;
+            }
+         }
       }
 
       // Return error if all buffers were pinned
